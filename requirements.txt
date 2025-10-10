@@ -1,0 +1,13 @@
+matplotlib
+numpy
+pandas
+plotly
+polars
+pyarrow
+PyYAML
+requests
+holidays
+seaborn
+MetaTrader5
+pytest
+pytest-mock
