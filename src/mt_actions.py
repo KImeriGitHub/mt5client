@@ -1,6 +1,5 @@
-import MetaTrader5 as mt5
 from typing import Literal, Any, Optional
-import pandas as pd
+import MetaTrader5 as mt5
 import polars as pl
 
 ###################
@@ -13,7 +12,7 @@ def _to_df(namedtuples: Any) -> pl.DataFrame:
     rows = [nt._asdict() for nt in namedtuples]
     return pl.DataFrame(rows)
 
-def get_position_df() -> pl.DataFrame:
+def get_position_helper() -> pl.DataFrame:
     """
     Return current open positions as a Polars DataFrame.
 
@@ -27,12 +26,12 @@ def get_position_df() -> pl.DataFrame:
         return df
 
     df = df.with_columns(
-        pl.col("time").dt.from_epoch(unit="s")
+        pl.col("time").dt.epoch(time_unit="s")
     ).drop(["time_update", "time_msc", "time_update_msc", "external_id"], strict=False)
 
     return df
 
-def get_orders_df() -> pl.DataFrame:
+def get_orders_helper() -> pl.DataFrame:
     """
     Return current pending orders as a Polars DataFrame.
 
@@ -45,9 +44,40 @@ def get_orders_df() -> pl.DataFrame:
         return df
 
     if "time_setup" in df.columns:
-        df = df.with_columns(pl.col("time_setup").dt.from_epoch(unit="s"))
+        df = df.with_columns(pl.col("time_setup").dt.epoch(time_unit="s"))
 
     return df
+
+def get_symbol_price_helper(symbol: str) -> dict:
+    """
+    Get current price information for a symbol.
+
+    Args:
+        symbol: MT5 symbol (e.g., 'EURUSD').
+
+    Returns:
+        dict: Dictionary containing 'bid', 'ask', 'last', 'spread', and 'spread_pct'.
+              Returns empty dict if symbol not found or no tick data.
+    """
+    tick = mt5.symbol_info_tick(symbol)
+    if tick is None:
+        return {}
+    
+    bid = float(tick.bid)
+    ask = float(tick.ask)
+    last = float(tick.last)
+    spread = ask - bid
+    spread_pct = (spread / ask) * 100 if ask > 0 else 0
+    
+    return {
+        'symbol': symbol,
+        'bid': bid,
+        'ask': ask,
+        'last': last,
+        'spread': spread,
+        'spread_pct': spread_pct,
+        'time': tick.time
+    }
 
 #####################
 ### PLACE ACTIONS ###
@@ -66,7 +96,7 @@ def _latest_prices(symbol: str) -> tuple[float, float]:
         raise RuntimeError(f"No tick for {symbol}")
     return float(tick.bid), float(tick.ask)
 
-def place_market_order(
+def place_market_order_helper(
     symbol: str,
     vol: float,
     buy_sell: Literal["B","S","Buy","Sell","buy","sell","b","s"],
@@ -116,9 +146,14 @@ def place_market_order(
     if tp is not None:
         request["tp"] = tp
 
+    # Validate the order before sending
+    check_result = mt5.order_check(request)
+    if check_result is None or check_result.retcode != mt5.TRADE_RETCODE_DONE:
+        return None
+
     return mt5.order_send(request)
 
-def place_limit_order(
+def place_limit_order_helper(
     symbol: str,
     vol: float,
     buy_sell: Literal["B","S","Buy","Sell","buy","sell","b","s"],
@@ -156,4 +191,10 @@ def place_limit_order(
         "type_time": mt5.ORDER_TIME_GTC,
         "type_filling": mt5.ORDER_FILLING_RETURN,
     }
+    
+    # Validate the order before sending
+    check_result = mt5.order_check(request)
+    if check_result is None or check_result.retcode != mt5.TRADE_RETCODE_DONE:
+        return None
+        
     return mt5.order_send(request)

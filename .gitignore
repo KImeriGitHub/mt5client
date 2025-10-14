@@ -6,3 +6,6 @@ venv
 
 secrets/*
 !secrets/.gitignore
+
+logs/*
+!logs/.gitignore
