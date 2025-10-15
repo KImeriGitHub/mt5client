@@ -26,7 +26,7 @@ def get_position_helper() -> pl.DataFrame:
         return df
 
     df = df.with_columns(
-        pl.col("time").dt.epoch(time_unit="s")
+        pl.col("time").dt.epoch(time_unit="ms")
     ).drop(["time_update", "time_msc", "time_update_msc", "external_id"], strict=False)
 
     return df
@@ -44,7 +44,7 @@ def get_orders_helper() -> pl.DataFrame:
         return df
 
     if "time_setup" in df.columns:
-        df = df.with_columns(pl.col("time_setup").dt.epoch(time_unit="s"))
+        df = df.with_columns(pl.col("time_setup").dt.epoch(time_unit="ms"))
 
     return df
 
