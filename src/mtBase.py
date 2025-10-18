@@ -1,9 +1,16 @@
 import MetaTrader5 as mt5
 import yaml
 import configparser
-from typing import Literal, Any, Optional
+from typing import Literal, Any, Optional, Mapping
 
-from .mt_actions import get_position_helper, get_orders_helper, get_symbol_price_helper, place_market_order_helper, place_limit_order_helper
+from .mt_actions import (
+    get_position_helper, 
+    get_orders_helper, 
+    get_symbol_price_helper, 
+    place_market_order_helper, 
+    place_limit_order_helper, 
+    close_position_helper
+)
 
 class mtBase:
     """
@@ -33,6 +40,29 @@ class mtBase:
         with open(self.credentials_path, 'r') as file:
             return yaml.safe_load(file)
 
+    def _merge_call_params(
+        self,
+        defaults: dict[str, Any],
+        overrides: Optional[Mapping[str, Any]],
+        *,
+        context: str,
+        required_keys: tuple[str, ...] = (),
+    ) -> dict[str, Any]:
+        """Merge defaults with user supplied overrides and validate required keys."""
+        if overrides is not None:
+            if not isinstance(overrides, Mapping):
+                raise TypeError(f"{context} expects a mapping for parameter overrides, got {type(overrides).__name__}.")
+            defaults = defaults.copy()
+            for key, value in overrides.items():
+                defaults[key] = value
+
+        missing = [key for key in required_keys if defaults.get(key) is None]
+        if missing:
+            missing_list = ", ".join(missing)
+            raise ValueError(f"{context} requires values for: {missing_list}.")
+
+        return defaults
+
     def check_login(self) -> bool:
         """
         Check if the current MetaTrader 5 login matches the expected login number.
@@ -54,12 +84,12 @@ class mtBase:
         acc_info = mt5.account_info()
         
         if acc_info is not None:
-            print(f"Already logged in to account {acc_info.login}")
+            print(f"MetaTrader 5 initialization: Logged in to account {acc_info.login}")
             if self.check_login():
-                print(f"Logged in to the correct account: {self.account} ({self.login_number})")
+                print(f"MetaTrader 5 initialization: Logged in to the correct account: {self.account} ({self.login_number})")
                 return mt5
             else:
-                print(f"Warning: Logged in to a different account ({acc_info.login}). Re-initializing...")
+                print(f"MetaTrader 5 initialization: Logged in to a different account ({acc_info.login}). Re-initializing...")
                 mt5.shutdown()
 
         credentials = self.__load_yaml()
@@ -78,6 +108,8 @@ class mtBase:
         del credentials  #secrets cleanup
 
     def shutdown(self):
+        if not self.check_login():
+            raise RuntimeError("Not logged in or wrong account.")
         mt5.shutdown()
         print("MetaTrader 5 connection closed")
 
@@ -108,49 +140,114 @@ class mtBase:
             raise RuntimeError("Not logged in or wrong account.")
 
         return get_symbol_price_helper(symbol)
+
+    def get_account_info(self):
+        """Return the latest MetaTrader 5 account information."""
+        if not self.check_login():
+            raise RuntimeError("Not logged in or wrong account.")
+        return mt5.account_info()
+
+    def get_symbol_info(self, symbol: str):
+        """Wrapper around mt5.symbol_info for consistency."""
+        if not self.check_login():
+            raise RuntimeError("Not logged in or wrong account.")
+        return mt5.symbol_info(symbol)
+
+    def get_symbol_tick(self, symbol: str):
+        """Wrapper around mt5.symbol_info_tick for consistency."""
+        if not self.check_login():
+            raise RuntimeError("Not logged in or wrong account.")
+        return mt5.symbol_info_tick(symbol)
+
+    def select_symbol(self, symbol: str, enable: bool = True) -> bool:
+        """Ensure a symbol is available in the Market Watch list."""
+        if not self.check_login():
+            raise RuntimeError("Not logged in or wrong account.")
+        return mt5.symbol_select(symbol, enable)
     
     def place_market_order(
         self,
-        symbol: str,
-        vol: float,
-        buy_sell: Literal["B","S","Buy","Sell","buy","sell","b","s"],
+        symbol: Optional[str] = None,
+        max_nom_value: Optional[float] = None,
+        buy_sell: Optional[Literal["B","S","Buy","Sell","buy","sell","b","s"]] = None,
         sl_pct: Optional[float] = None,
         tp_pct: Optional[float] = None,
+        magic: int = 0,
+        order_params: Optional[Mapping[str, Any]] = None,
     ) -> Any:
         if not self.check_login():
             raise RuntimeError("Not logged in or wrong account.")
 
-        result = place_market_order_helper(
-            symbol=symbol,
-            vol=vol,
-            buy_sell=buy_sell,
-            sl_pct=sl_pct,
-            tp_pct=tp_pct,
+        helper_params = self._merge_call_params(
+            {
+                "symbol": symbol,
+                "max_nom_value": max_nom_value,
+                "buy_sell": buy_sell,
+                "sl_pct": sl_pct,
+                "tp_pct": tp_pct,
+                "deviation_pts": 10,
+                "magic": magic,
+            },
+            order_params,
+            context="place_market_order",
+            required_keys=("symbol", "max_nom_value", "buy_sell"),
         )
-        
-        if result is None:
-            print(f"Market order validation failed for {symbol}")
-            
+
+        result = place_market_order_helper(**helper_params)
         return result
     
     def place_limit_order(
         self,
-        symbol: str,
-        vol: float,
-        buy_sell: Literal["B","S","Buy","Sell","buy","sell","b","s"],
+        symbol: Optional[str] = None,
+        max_nom_value: Optional[float] = None,
+        buy_sell: Optional[Literal["B","S","Buy","Sell","buy","sell","b","s"]] = None,
         pct_away: float = 0.01,
+        sl_pct: Optional[float] = None,
+        tp_pct: Optional[float] = None,
+        magic: int = 0,
+        order_params: Optional[Mapping[str, Any]] = None,
     ) -> Any:
         if not self.check_login():
             raise RuntimeError("Not logged in or wrong account.")
 
-        result = place_limit_order_helper(
-            symbol=symbol,
-            vol=vol,
-            buy_sell=buy_sell,
-            pct_away=pct_away,
+        helper_params = self._merge_call_params(
+            {
+                "symbol": symbol,
+                "max_nom_value": max_nom_value,
+                "buy_sell": buy_sell,
+                "pct_away": pct_away,
+                "sl_pct": sl_pct,
+                "tp_pct": tp_pct,
+                "magic": magic,
+            },
+            order_params,
+            context="place_limit_order",
+            required_keys=("symbol", "max_nom_value", "buy_sell"),
         )
+
+        result = place_limit_order_helper(**helper_params)
+        return result
+    
+    def close_position(
+        self,
+        ticket: Optional[int] = None,
+        deviation_pts: int = 10,
+        magic: int = 0,
+        close_params: Optional[Mapping[str, Any]] = None,
+    ) -> Any:
+        if not self.check_login():
+            raise RuntimeError("Not logged in or wrong account.")
         
-        if result is None:
-            print(f"Limit order validation failed for {symbol}")
-            
+        helper_params = self._merge_call_params(
+            {
+                "ticket": ticket,
+                "deviation_pts": deviation_pts,
+                "magic": magic,
+            },
+            close_params,
+            context="close_position",
+            required_keys=("ticket",),
+        )
+
+        result = close_position_helper(**helper_params)
         return result
