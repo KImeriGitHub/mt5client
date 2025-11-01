@@ -1,0 +1,42 @@
+# Development Environment Configuration
+# Configuration for development/testing
+
+# File paths - adjusted for development
+paths:
+  credentials: "secrets/mt5_acc_cred.yaml"
+  mt5_config: "secrets/mt5_config.ini"
+  predictions_dir: "predictions/dev"
+  artifacts_dir: "artifacts/dev"
+  
+# Trading parameters - more conservative for development
+trading:
+  # Shorter working duration for testing
+  max_working_duration_minutes: 15
+  
+  # More conservative position sizing for development
+  per_day_divisor: 2
+  
+  # Budget discrepancy tolerance for development (higher tolerance for testing)
+  max_budget_discrepancy: 0.5
+  
+# Market access parameters - more frequent checks for development
+market_access:
+  # Shorter wait times for faster testing
+  max_market_access_duration_seconds: 20
+  
+  # Allow slightly older ticks in development
+  max_tick_age_seconds: 5
+
+# Logging configuration - more verbose for development
+logging:
+  # Debug level for development
+  level: "DEBUG"
+  
+  # Detailed format for development
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(funcName)s:%(lineno)d - %(message)s"
+  
+  # Standard date format
+  datefmt: "%Y-%m-%d %H:%M:%S"
+  
+  # Development log directory
+  log_dir: "logs/dev"

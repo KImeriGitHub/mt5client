@@ -2,7 +2,7 @@
 Prediction file parser for extracting trading data from JSON files.
 
 This module provides functionality to parse prediction JSON files and extract
-variables that can be used with the place_market_order_helper function.
+variables that can be used with the placing orders function.
 """
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Union
@@ -11,78 +11,8 @@ import glob
 from datetime import datetime, timezone, date
 import polars as pl
 
-
-class PredictionData:
-    """
-    Container for prediction data from JSON files.
-    
-    Attributes:
-        symbol (str): Trading pair symbol.
-            Example: "NVDA", "MU", "AUDUSD"
-        
-        last_training_day (date): The last day used in model training.
-            Example: date(2025, 10, 14) for October 14th, 2025
-        
-        last_close_price (float): The closing price on the last training day.
-            Example: 1.0845 for EUR/USD at $1.0845
-        
-        n_trading_days (int): Number of trading days for the prediction horizon.
-            Example: 5 (predicting 5 days ahead)
-        
-        score (float): Score, typically positive.
-            Example: 0.73
-        
-        sl_pct (float, optional): Stop loss percentage as a positive decimal.
-            Example: 0.1 (10% stop loss), defaults to None if not provided
-        
-        tp_pct (float, optional): Take profit percentage as a positive decimal.
-            Example: 0.1 (10% take profit), defaults to None if not provided
-    """
-    
-    def __init__(
-        self,
-        symbol: str,
-        last_training_day: date,
-        last_close_price: float,
-        n_trading_days: int,
-        score: float,
-        sl_pct: Optional[float] = None,
-        tp_pct: Optional[float] = None
-    ):
-        self.symbol = symbol
-        self.last_training_day = last_training_day
-        self.last_close_price = last_close_price
-        self.n_trading_days = n_trading_days
-        self.score = score
-        self.sl_pct = sl_pct
-        self.tp_pct = tp_pct
-    
-    def __repr__(self) -> str:
-        return (f"PredictionData(symbol='{self.symbol}', "
-                f"last_training_day='{self.last_training_day}', "
-                f"last_close_price={self.last_close_price}, "
-                f"n_trading_days={self.n_trading_days}, "
-                f"score={self.score}, "
-                f"sl_pct={self.sl_pct}, "
-                f"tp_pct={self.tp_pct})")
-    
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary format."""
-        result = {
-            'symbol': self.symbol,
-            'last_training_day': self.last_training_day.isoformat(),
-            'last_close_price': self.last_close_price,
-            'n_trading_days': self.n_trading_days,
-            'score': self.score
-        }
-        
-        # Only include sl_pct and tp_pct if they are not None
-        if self.sl_pct is not None:
-            result['sl_pct'] = self.sl_pct
-        if self.tp_pct is not None:
-            result['tp_pct'] = self.tp_pct
-            
-        return result
+from .PredictionData import PredictionData
+from ..common import magic_from
 
 
 class PredictionParser:
@@ -191,14 +121,30 @@ class PredictionParser:
             if tp_pct is not None:
                 tp_pct = float(tp_pct)
             
-            pred = PredictionData(
+            # Create a temporary instance to calculate magic
+            temp_pred = PredictionData(
                 symbol=str(item['symbol']),
                 last_training_day=self._parse_iso_date(str(item['last_training_day'])),
                 last_close_price=float(item['last_close_price']),
                 n_trading_days=int(item['n_trading_days']),
                 score=float(item['score']),
+                magic=0,  # Temporary value
                 sl_pct=sl_pct,
                 tp_pct=tp_pct
+            )
+            
+            # Calculate magic and create final instance
+            magic = magic_from(temp_pred)
+            pred = PredictionData(
+                symbol=temp_pred.symbol,
+                last_training_day=temp_pred.last_training_day,
+                last_close_price=temp_pred.last_close_price,
+                n_trading_days=temp_pred.n_trading_days,
+                score=temp_pred.score,
+                magic=magic,
+                sl_pct=sl_pct,
+                tp_pct=tp_pct,
+                source=file_path.name
             )
             predictions.append(pred)
         

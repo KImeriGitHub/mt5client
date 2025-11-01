@@ -12,3 +12,6 @@ logs/*
 
 predictions/*
 !predictions/.gitignore
+
+artifacts/*
+!artifacts/.gitignore

@@ -1,0 +1,42 @@
+# Production Environment Configuration
+# Configuration for live trading
+
+# File paths
+paths:
+  credentials: "secrets/mt5_acc_cred.yaml"
+  mt5_config: "secrets/mt5_config.ini"
+  predictions_dir: "predictions"
+  artifacts_dir: "artifacts"
+  
+# Trading parameters - production values
+trading:
+  # Longer working duration for production
+  max_working_duration_minutes: 45
+  
+  # Standard position sizing for production
+  per_day_divisor: 3
+  
+  # Budget discrepancy tolerance for production (stricter tolerance)
+  max_budget_discrepancy: 0.1
+  
+# Market access parameters - production settings
+market_access:
+  # Standard wait times for production
+  max_market_access_duration_seconds: 10
+  
+  # Strict tick freshness requirements for production
+  max_tick_age_seconds: 3
+
+# Logging configuration - production appropriate
+logging:
+  # Info level for production (less verbose)
+  level: "INFO"
+  
+  # Clean format for production
+  format: "%(asctime)s - %(levelname)s - %(message)s"
+  
+  # Standard date format
+  datefmt: "%Y-%m-%d %H:%M:%S"
+  
+  # Production log directory
+  log_dir: "logs"

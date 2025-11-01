@@ -11,3 +11,4 @@ seaborn
 MetaTrader5
 pytest
 pytest-mock
+pandas_market_calendars
