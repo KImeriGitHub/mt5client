@@ -380,7 +380,7 @@ class TestChooseFilling:
         
         _choose_filling(info)
         
-        mock_logger.warning.assert_called_with("Warning: Filling mode is not FOK: using ORDER_FILLING_FOK.")
+        mock_logger.info.assert_called_with("Standard Filling mode is not FOK: using ORDER_FILLING_FOK.")
 
 
 class TestVolumeFromBudget:
@@ -684,8 +684,8 @@ class TestPredictionToOrders:
         result = prediction_to_orders(mock_pred, budget, vol_divisor, mock_base)
         
         # Verify calls
-        mock_base.get_symbol_price.assert_called_once_with("AAPL", wait_sec=0.01)
-        mock_base.get_symbol_info.assert_called_once_with("AAPL", wait_sec=0.01)
+        mock_base.get_symbol_price.assert_called_once_with("AAPL", wait_sec=0.02)
+        mock_base.get_symbol_info.assert_called_once_with("AAPL", wait_sec=0.02)
         mock_volume_from_budget.assert_called_once_with(budget, 150.0, mock_symbol_info, mock_base)
         mock_calc_vol.assert_called_once_with(4.0, mock_symbol_info, vol_divisor)
         

@@ -34,34 +34,47 @@ def calculate_trading_day(input_date: date, n_days: int, market: str = 'NYSE') -
 
     if not isinstance(input_date, date):
         raise ValueError("input_date must be a datetime.date.")
-    if n_days < 0:
+    if not isinstance(n_days, int) or n_days < 0:
         raise ValueError("n_days must be a non-negative integer.")
+    if not isinstance(market, str) or not market:
+        raise ValueError("market must be a non-empty string.")
+
     if n_days == 0:
         return input_date
 
-    input_dt = pd.to_datetime(input_date).tz_localize(None)
-    
-    # Get the market calendar
-    calendar = mcal.get_calendar(market)
-    
-    # Get trading days around the input date
-    # We need a wider range to ensure we capture enough trading days
-    buffer = 30
-    start_range = input_dt - pd.Timedelta(days=buffer)
-    end_range = input_dt + pd.Timedelta(days=abs(n_days) + buffer)
-    
-    # Get valid trading days
-    trading_days = calendar.valid_days(start_date=start_range, end_date=end_range, tz="UTC")
-    
-    # If input_dt is not a trading day, find the previous trading day
-    input_is_trading_day = input_dt in trading_days
-    base_trading_day = input_dt
-    if not input_is_trading_day:
-        # Find the last trading day before input_dt
-        past_days = trading_days[trading_days <= input_dt]
-        base_trading_day = past_days[-1]
-    
-    base_idx = trading_days.get_loc(base_trading_day)
-    target_idx = base_idx + n_days
+    # Normalize to naïve midnight for safe comparisons
+    input_ts = pd.Timestamp(input_date).normalize()
 
-    return trading_days[target_idx].date()
+    cal = mcal.get_calendar(market)
+
+    # Wide enough window to safely index forward n_days from the base trading day
+    buffer = 30 + n_days
+    start_range = input_ts - pd.Timedelta(days=buffer)
+    end_range   = input_ts + pd.Timedelta(days=buffer)
+
+    # Get valid trading days, force naïve normalized timestamps
+    td = cal.valid_days(start_date=start_range, end_date=end_range)
+    td = pd.DatetimeIndex(td)  # ensure DatetimeIndex
+    if td.tz is not None:
+        td = td.tz_localize(None)
+    td = td.normalize()
+
+    # If input date isn't a trading day, anchor to the previous trading day
+    if input_ts in td:
+        base_ts = input_ts
+    else:
+        past = td[td <= input_ts]
+        if len(past) == 0:
+            raise RuntimeError("No past trading days found in range. Increase buffer or check calendar.")
+        base_ts = past[-1]
+
+    # Locate base index and move forward n_days
+    base_idx = td.get_indexer([base_ts])[0]
+    if base_idx == -1:
+        raise RuntimeError("Base trading day unexpectedly not found in trading days index.")
+
+    target_idx = base_idx + n_days
+    if target_idx >= len(td):
+        raise RuntimeError("Target index out of range. Increase buffer.")
+
+    return td[target_idx].date()

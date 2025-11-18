@@ -20,7 +20,7 @@ from src.infra.TradingConfig import TradingConfig
 from src.Checks import Checks
 
 from src.finalize_predictions import finalize_predictions
-from src.logging_utils import setup_logging
+from src.logging_utils import setup_console_and_file_logging
 from src.place_order import place_order
 from src.prediction_to_orders import prediction_to_orders
 
@@ -65,7 +65,7 @@ def main(args=None, dry_run_suffix="", setup_logs=True) -> list[OrderData]:
 
     # Set up logging based on configuration (only if requested)
     if setup_logs:
-        log_file_path = setup_logging(
+        log_file_path = setup_console_and_file_logging(
             log_dir=config.log_dir,
             log_level=config.log_level,
             log_format=config.log_format,
@@ -76,7 +76,15 @@ def main(args=None, dry_run_suffix="", setup_logs=True) -> list[OrderData]:
     predictions_dir = Path(config.predictions_dir)
 
     base = mtBase(args.account, config.credentials_path, config.mt5_config_path)
+    logger.info("Initializing MetaTrader 5 connection...")
     base.mt5_init()
+    # Wait for the user to press the Algo-Trading button
+    wait_seconds = 5
+    logger.info("="*20)
+    logger.info(f"Waiting {wait_seconds} seconds for Algo-Trading to be enabled...")
+    logger.info("="*20)
+    time.sleep(wait_seconds)
+
     pred_client = PredictionClient(base=base, predictions_dir=predictions_dir)
     pos_client = PositionClient(base=base)
     order_client = OrderClient(base=base)
@@ -85,17 +93,11 @@ def main(args=None, dry_run_suffix="", setup_logs=True) -> list[OrderData]:
         per_day_divisor=config.per_day_divisor, 
         max_budget_discrepancy=config.max_budget_discrepancy
     )
-
-    ###########################
-    ### INIT MT5 CONNECTION ###
-    ###########################
-    logger.info("Initializing MetaTrader 5 connection and loading positions...")
-    base.mt5_init()
     
     ########################
     ### INIT PREDICTIONS ###
     ########################
-    logger.info("Loading predictions...")
+    logger.info("Loading predictions and positions...")
     predictions_list_all = pred_client.load_predictions(args.group)
     predictions_list, budget_list, volumedivisor_list = finalize_predictions(
         predictions_list_all, 
@@ -108,6 +110,9 @@ def main(args=None, dry_run_suffix="", setup_logs=True) -> list[OrderData]:
     pos_all = pos_client.get_positions()
     if Checks.preds_in_positions(predictions_list, pos_all):
         logger.error("Aborting: Some predictions already have open positions.")
+        return
+    if Checks.all_predictions_valid(predictions_list) is False:
+        logger.error("Aborting: Predictions are invalid. Check prediction expiry dates.")
         return
     if sum(budget_list) >= balance_manager.free_margin:
         logger.error("Aborting: Insufficient free margin for placing orders.")
@@ -137,6 +142,17 @@ def main(args=None, dry_run_suffix="", setup_logs=True) -> list[OrderData]:
 
         (pred, budget, volumedivisor) = pending_trade_queue.popleft()
 
+        pricetick = base.get_symbol_price(pred.symbol, wait_sec=0.02)
+        if (pricetick is None 
+            or pricetick.get('bid') is None
+            or pricetick.get('ask') is None
+            or pricetick.get('bid') < 1e-5
+            or pricetick.get('ask') < 1e-5):
+            logger.warning(f"Requeing {pred.symbol}: Unable to fetch price data.")
+            pending_trade_queue.append((pred, budget, volumedivisor))
+            time.sleep(config.retry_wait_sec)
+            continue
+
         # Create orders from prediction
         orders: list[OrderData] = prediction_to_orders(
             pred=pred,
@@ -148,14 +164,23 @@ def main(args=None, dry_run_suffix="", setup_logs=True) -> list[OrderData]:
         # Place each order
         logger.info(f"Placing orders for symbol: {pred.symbol}")
         
+        status = 0
+        ith = 0
         for order in orders:
-            order_client.log_orders(order, indent=2)
+            ith += 1
+            order_client.log_orders(order, indent=2, add_msg=f"Order {ith} of {len(orders)} for {pred.symbol}")
 
             if args.apply:
                 status, msg = place_order(order, order_client, base, is_dry_run=False)
                 if status == 0:
                     logger.info(msg)
                     placed_orders.append(order)
+                if status == 10018:  # Market closed
+                    logger.warning(msg)
+                    _, le = base.last_error()
+                    logger.warning(f"MetaTrader5 error code: {le}")
+                    logger.info(f"Requeing {pred.symbol}: Market closed.")
+                    break  # Exit placing further orders for this symbol
                 else:
                     logger.warning(msg)
                     _, le = base.last_error()
@@ -165,10 +190,17 @@ def main(args=None, dry_run_suffix="", setup_logs=True) -> list[OrderData]:
                 if status == 0:
                     logger.info(msg)
                     placed_orders.append(order)
-                else:
+                else: # Status  == 1
                     logger.warning(msg)
                     _, le = base.last_error()
                     logger.warning(f"MetaTrader5 error code: {le}")
+        if status == 10018:
+            budget_trunc = (len(orders) - (ith-1))/len(orders) * budget
+            volumedivisor_trunc = (len(orders) - (ith-1))
+            logger.info(f"Requeing {pred.symbol}: Market closed. Remaining budget: {budget_trunc}, Remaining volume divisor: {volumedivisor_trunc}")
+            pending_trade_queue.append((pred, budget_trunc, volumedivisor_trunc))
+            time.sleep(config.retry_wait_sec)
+            continue
 
     ################
     ### FINALIZE ###

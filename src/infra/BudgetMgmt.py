@@ -51,3 +51,23 @@ class BudgetMgmt:
         """Refresh account information."""
         self.free_margin = self._get_free_margin()
         self.total_capital = self._get_total_capital()
+    
+    def calc_daily_budget(self) -> float:
+        """
+        Calculate the total available budget for trading operations.
+        
+        Determines the maximum expenditure allowed by taking the minimum of:
+        1. Available free margin in the trading account
+        2. Daily capital allocation (total capital divided by per-day divisor)
+        
+        This ensures trading operations don't exceed account limits or daily risk parameters.
+        
+        Returns:
+            Maximum budget available for trading as a float
+        """
+        # Calculate daily capital allocation based on risk management divisor
+        total_cap_per_day = self.total_capital / self.per_day_divisor
+
+        # Use the more restrictive of free margin or daily allocation
+        budget = min(self.free_margin, total_cap_per_day)
+        return budget

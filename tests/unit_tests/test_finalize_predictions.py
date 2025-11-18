@@ -7,7 +7,6 @@ from typing import Counter
 
 from src.finalize_predictions import (
     _combine_predictions,
-    _calc_budget,
     finalize_predictions,
     rm_small_volume_predictions
 )
@@ -119,45 +118,7 @@ class TestCombinePredictions:
 
 class TestCalcBudget:
     """Test cases for _calc_budget function."""
-    
-    def test_calc_budget_free_margin_lower(self):
-        """Test _calc_budget when free margin is lower than total capital per day."""
-        mock_budget_mgmt = MagicMock(spec=BudgetMgmt)
-        mock_budget_mgmt.free_margin = 5000.0
-        mock_budget_mgmt.total_capital = 30000.0
-        mock_budget_mgmt.per_day_divisor = 3
-        
-        result = _calc_budget(mock_budget_mgmt)
-        
-        # total_cap_per_day = 30000 / 3 = 10000
-        # min(5000, 10000) = 5000
-        assert result == 5000.0
-    
-    def test_calc_budget_total_capital_per_day_lower(self):
-        """Test _calc_budget when total capital per day is lower than free margin."""
-        mock_budget_mgmt = MagicMock(spec=BudgetMgmt)
-        mock_budget_mgmt.free_margin = 15000.0
-        mock_budget_mgmt.total_capital = 20000.0
-        mock_budget_mgmt.per_day_divisor = 4
-        
-        result = _calc_budget(mock_budget_mgmt)
-        
-        # total_cap_per_day = 20000 / 4 = 5000
-        # min(15000, 5000) = 5000
-        assert result == 5000.0
-    
-    def test_calc_budget_equal_values(self):
-        """Test _calc_budget when free margin equals total capital per day."""
-        mock_budget_mgmt = MagicMock(spec=BudgetMgmt)
-        mock_budget_mgmt.free_margin = 8000.0
-        mock_budget_mgmt.total_capital = 24000.0
-        mock_budget_mgmt.per_day_divisor = 3
-        
-        result = _calc_budget(mock_budget_mgmt)
-        
-        # total_cap_per_day = 24000 / 3 = 8000
-        # min(8000, 8000) = 8000
-        assert result == 8000.0
+    pass
 
 
 class TestRmSmallVolumePredictions:
@@ -445,6 +406,7 @@ class TestFinalizePredictions:
         mock_budget_mgmt.total_capital = 30000.0
         mock_budget_mgmt.per_day_divisor = 3
         mock_budget_mgmt.max_budget_discrepancy = 0.1
+        mock_budget_mgmt.calc_daily_budget.return_value = 10000.0
         
         # Create mock prediction client
         mock_pred_client = MagicMock(spec=PredictionClient)
@@ -462,6 +424,7 @@ class TestFinalizePredictions:
         
         # Verify calls
         mock_pred_client.latest_predictions.assert_called_once_with(preds)
+        mock_budget_mgmt.calc_daily_budget.assert_called_once()
         mock_rm_small_volume.assert_called_once_with([pred1, pred2], [1, 1], 10000.0, mock_base, 0.1)
         
         # Verify results
@@ -505,6 +468,7 @@ class TestFinalizePredictions:
         mock_budget_mgmt.total_capital = 36000.0
         mock_budget_mgmt.per_day_divisor = 3
         mock_budget_mgmt.max_budget_discrepancy = 0.1
+        mock_budget_mgmt.calc_daily_budget.return_value = 12000.0
         
         # Create mock prediction client
         mock_pred_client = MagicMock(spec=PredictionClient)
@@ -569,6 +533,7 @@ class TestFinalizePredictions:
         mock_budget_mgmt.total_capital = 24000.0
         mock_budget_mgmt.per_day_divisor = 4
         mock_budget_mgmt.max_budget_discrepancy = 0.1
+        mock_budget_mgmt.calc_daily_budget.return_value = 6000.0
         
         mock_pred_client = MagicMock(spec=PredictionClient)
         mock_pred_client.latest_predictions.return_value = preds
@@ -588,7 +553,7 @@ class TestFinalizePredictions:
         assert result_preds[0] == pred
         assert result_divisors == [1]
         
-        # Total budget: min(8000, 24000/4) = min(8000, 6000) = 6000
+        # Total budget: 6000 (from mocked calc_daily_budget)
         expected_budget = 6000.0 - 1e-9  # Account for epsilon
         assert result_budgets == [expected_budget]
     
@@ -656,6 +621,7 @@ class TestFinalizePredictions:
         mock_budget_mgmt.total_capital = 45000.0
         mock_budget_mgmt.per_day_divisor = 3
         mock_budget_mgmt.max_budget_discrepancy = 0.1
+        mock_budget_mgmt.calc_daily_budget.return_value = 15000.0
         
         mock_pred_client = MagicMock(spec=PredictionClient)
         mock_pred_client.latest_predictions.return_value = preds

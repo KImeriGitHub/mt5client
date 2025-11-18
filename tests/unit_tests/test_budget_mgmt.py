@@ -313,3 +313,60 @@ class TestBudgetMgmt:
         # Should raise error since <= 1e-6
         with pytest.raises(RuntimeError, match="Account has no total capital information"):
             BudgetMgmt(base=mock_base)
+    
+    def test_calc_daily_budget_basic_functionality(self):
+        """Test calc_daily_budget method with basic scenarios."""
+        # Create mock mtBase
+        mock_base = MagicMock(spec=mtBase)
+        
+        # Test case where free margin is limiting
+        mock_account_info = MagicMock()
+        mock_account_info.margin_free = 2000.0  # Lower than daily allocation
+        mock_account_info.equity = 12000.0      # 12000 / 3 = 4000 daily
+        
+        mock_base.get_account_info.return_value = mock_account_info
+        
+        budget = BudgetMgmt(base=mock_base, per_day_divisor=3.0)
+        result = budget.calc_daily_budget()
+        
+        # Should return free margin as it's smaller
+        assert result == 2000.0
+    
+    def test_calc_daily_budget_daily_allocation_limiting(self):
+        """Test calc_daily_budget when daily allocation is the limiting factor."""
+        # Create mock mtBase
+        mock_base = MagicMock(spec=mtBase)
+        
+        # Test case where daily allocation is limiting
+        mock_account_info = MagicMock()
+        mock_account_info.margin_free = 8000.0  # Higher than daily allocation
+        mock_account_info.equity = 15000.0      # 15000 / 5 = 3000 daily
+        
+        mock_base.get_account_info.return_value = mock_account_info
+        
+        budget = BudgetMgmt(base=mock_base, per_day_divisor=5.0)
+        result = budget.calc_daily_budget()
+        
+        # Should return daily allocation as it's smaller
+        assert result == 3000.0
+    
+    def test_refresh_error_handling(self):
+        """Test refresh method error handling."""
+        # Create mock mtBase
+        mock_base = MagicMock(spec=mtBase)
+        
+        # Initial account info
+        initial_account_info = MagicMock()
+        initial_account_info.margin_free = 5000.0
+        initial_account_info.equity = 10000.0
+        
+        mock_base.get_account_info.return_value = initial_account_info
+        
+        budget = BudgetMgmt(base=mock_base)
+        
+        # Now simulate account info becoming None
+        mock_base.get_account_info.return_value = None
+        
+        # refresh() should raise RuntimeError
+        with pytest.raises(RuntimeError, match="Account has no margin_free information"):
+            budget.refresh()

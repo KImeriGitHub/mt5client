@@ -1,10 +1,28 @@
 # Prediction File Format Specification
 
-This document describes the expected format and structure of prediction JSON files used by the DarwinexClient trading system.
+## Table of Contents
+- [Overview](#overview)
+- [File Organization](#file-organization)
+- [File Naming Convention](#file-naming-convention)
+- [JSON Structure](#json-file-structure)
+- [Field Specifications](#field-specifications)
+- [Example Files](#example-files)
+- [Processing Behavior](#processing-behavior)
+- [Validation](#validation)
+- [Best Practices](#best-practices)
+- [Troubleshooting](#troubleshooting)
 
 ## Overview
 
-Prediction files contain machine learning model predictions for financial instruments that will be used to place automated trades. These files are stored in the `predictions/` directory and must follow a specific JSON format to be properly parsed by the system.
+Prediction files contain machine learning model predictions for financial instruments that will be used to place automated trades. These files are stored in environment-specific directories and must follow a specific JSON format to be properly parsed by the DarwinexClient trading system.
+
+## File Organization
+
+Prediction files are organized by environment:
+- **Production**: `predictions/` directory
+- **Development**: `predictions/dev/` directory
+
+The system automatically uses the appropriate directory based on your configuration file.
 
 ## File Naming Convention
 
@@ -186,4 +204,87 @@ This ensures each prediction can be uniquely identified in the trading system.
     }
   }
 }
+```
+
+## Validation
+
+The system performs several validation checks on prediction files:
+
+### Automatic Validation
+- **JSON syntax**: Files must be valid JSON
+- **Required fields**: All mandatory fields must be present
+- **Data types**: Fields must match expected types
+- **Date format**: `last_training_day` must be valid ISO 8601
+- **Numeric ranges**: Numbers must be positive where required
+
+### Manual Validation
+You can validate prediction files before using them:
+
+```bash
+# Test prediction file loading
+python -c "from src.infra.PredictionClient import PredictionClient; pc = PredictionClient('predictions'); print('Validation passed')"
+```
+
+## Best Practices
+
+### 1. File Organization
+- Use consistent naming conventions
+- Organize files by date and sequence
+- Keep development files separate from production
+
+### 2. Data Quality
+- Ensure `last_close_price` reflects actual market prices
+- Use reasonable values for `n_trading_days` (typically 1-30)
+- Set appropriate confidence scores (0-1 range)
+
+### 3. Risk Management
+- Always include `sl_pct` and `tp_pct` for risk control
+- Use conservative risk percentages for testing
+- Consider market volatility when setting risk levels
+
+### 4. Testing
+- Validate prediction files before deployment
+- Test with small position sizes first
+- Use development environment for validation
+
+## Troubleshooting
+
+### Common Issues
+
+**"Invalid JSON syntax"**
+- Check for missing commas, brackets, or quotes
+- Use a JSON validator online or in your editor
+- Ensure proper UTF-8 encoding
+
+**"Missing required field"**
+- Verify all required fields are present
+- Check field name spelling and case sensitivity
+- Ensure no null or empty values for required fields
+
+**"Invalid date format"**
+- Use ISO 8601 format: `"2025-10-14T00:00:00Z"`
+- Include timezone information
+- Avoid local date formats like MM/DD/YYYY
+
+**"File not found"**
+- Check file is in correct directory (`predictions/` or `predictions/dev/`)
+- Verify filename follows naming convention
+- Ensure file permissions allow reading
+
+**"No predictions loaded"**
+- Check if files match the expected group filter
+- Verify file naming pattern includes correct group
+- Ensure files contain valid prediction arrays
+
+### Debug Commands
+
+```bash
+# List prediction files
+dir predictions\*.json
+
+# Validate JSON syntax
+python -m json.tool predictions\your_file.json
+
+# Test prediction loading with debug output
+python place_prediction_orders.py --account test --config config/trading_config_dev.yaml
 ```

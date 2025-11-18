@@ -14,10 +14,13 @@ trading:
   max_working_duration_minutes: 45
   
   # Standard position sizing for production
-  per_day_divisor: 3
+  per_day_divisor: 5
   
   # Budget discrepancy tolerance for production (stricter tolerance)
   max_budget_discrepancy: 0.1
+  
+  # Position expiry in trading days
+  n_expiry_tdays: 4
   
 # Market access parameters - production settings
 market_access:
@@ -26,6 +29,9 @@ market_access:
   
   # Strict tick freshness requirements for production
   max_tick_age_seconds: 3
+
+  # Retry wait time for production
+  retry_wait_sec: 10
 
 # Logging configuration - production appropriate
 logging:

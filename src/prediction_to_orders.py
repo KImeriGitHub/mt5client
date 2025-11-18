@@ -83,7 +83,7 @@ def _choose_filling(info):
     if filling_mode == mt5.ORDER_FILLING_FOK:
         return mt5.ORDER_FILLING_FOK
     
-    logger.warning("Warning: Filling mode is not FOK: using ORDER_FILLING_FOK.")
+    logger.info("Standard Filling mode is not FOK: using ORDER_FILLING_FOK.")
     return mt5.ORDER_FILLING_FOK
 
 def _volume_from_budget(budget: float, price: float, info: dict, base: mtBase) -> float:
@@ -113,6 +113,7 @@ def _volume_from_budget(budget: float, price: float, info: dict, base: mtBase) -
         raise NotImplementedError("Currency conversion not implemented yet.")
     conv = 1.0 # default (no conversion)
     # volume in lots (may need step/min/max normalization later)
+    logger.info(f"Calculating volume from budget: {budget} / (price: {price} * contract_size: {trade_contract_size} * conv: {conv})")
     vol = budget / (price * trade_contract_size * conv)
     return vol
 
@@ -158,8 +159,8 @@ def prediction_to_orders(
         budget: Maximum total expenditure for all orders (in account currency).
     """
 
-    pricetick = base.get_symbol_price(pred.symbol, wait_sec=0.01)
-    symbolinfo = base.get_symbol_info(pred.symbol, wait_sec=0.01)
+    pricetick = base.get_symbol_price(pred.symbol, wait_sec=0.02)
+    symbolinfo = base.get_symbol_info(pred.symbol, wait_sec=0.02)
 
     # Eval Direction
     direction = mt5.ORDER_TYPE_BUY

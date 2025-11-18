@@ -84,7 +84,8 @@ class mtBase:
             path=self.mt5_loc_config['MetaTrader5']['terminal_path'], 
             login=self.login_number, 
             password=credentials[self.account]['apipw'], 
-            server=credentials[self.account]['server'], portable=False
+            server=credentials[self.account]['server'], 
+            portable=False
         )
         # Standard initialization with GUI
         if mt5_started:
@@ -92,6 +93,28 @@ class mtBase:
         else:
             _, le = mt5.last_error()
             print("MetaTrader 5 initialization failed, error code =", le)
+
+        del credentials  #secrets cleanup
+
+    def login(self):
+        """
+        Log in to the MetaTrader 5 account specified during initialization.
+        """
+        if self.check_login():
+            print(f"Already logged in to the correct account: {self.account} ({self.login_number})")
+            return
+
+        credentials = self.__load_yaml()
+        login_successful = mt5.login(
+            login=self.login_number, 
+            password=credentials[self.account]['apipw'], 
+            server=credentials[self.account]['server']
+        )
+        if login_successful:
+            print(f"Logged in to account {self.login_number} successfully.")
+        else:
+            _, le = mt5.last_error()
+            print(f"Failed to log in to account {self.login_number}, error code =", le)
 
         del credentials  #secrets cleanup
 

@@ -19,6 +19,9 @@ trading:
   # Budget discrepancy tolerance for development (higher tolerance for testing)
   max_budget_discrepancy: 0.5
   
+  # Position expiry in trading days
+  n_expiry_tdays: 4
+  
 # Market access parameters - more frequent checks for development
 market_access:
   # Shorter wait times for faster testing
@@ -26,6 +29,9 @@ market_access:
   
   # Allow slightly older ticks in development
   max_tick_age_seconds: 5
+
+  # Retry wait time for production
+  retry_wait_sec: 5
 
 # Logging configuration - more verbose for development
 logging:

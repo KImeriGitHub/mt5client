@@ -90,6 +90,11 @@ class TradingConfig:
         """Maximum allowed budget discrepancy tolerance."""
         return self._get_nested('trading.max_budget_discrepancy', 0.1)
     
+    @property
+    def n_expiry_tdays(self) -> int:
+        """Number of trading days for position expiry."""
+        return self._get_nested('trading.n_expiry_tdays', 0)
+    
     # Market access properties
     @property
     def max_market_access_duration_seconds(self) -> int:
@@ -100,6 +105,11 @@ class TradingConfig:
     def max_tick_age_seconds(self) -> int:
         """Maximum age of tick data to consider valid."""
         return self._get_nested('market_access.max_tick_age_seconds', 5)
+    
+    @property
+    def retry_wait_sec(self) -> float:
+        """Wait time in seconds between retry attempts."""
+        return self._get_nested('market_access.retry_wait_sec', 5.0)
     
     # Logging properties
     @property
@@ -149,6 +159,9 @@ class TradingConfig:
         
         if self.max_tick_age_seconds <= 0:
             raise ValueError("max_tick_age_seconds must be positive")
+        
+        if self.n_expiry_tdays < 0:
+            raise ValueError("n_expiry_tdays must be non-negative")
         
     def __repr__(self) -> str:
         """String representation of configuration."""

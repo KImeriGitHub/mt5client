@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Mapping, Tuple, Union, Literal
 from datetime import datetime
+import datetime as dt
 import polars as pl
 
 from .OrderData import OrderData
@@ -137,7 +138,7 @@ class OrderClient:
             comment=row.get("comment")
         )
 
-    def log_orders(self, orders: List[OrderData] | OrderData, indent: int = 2) -> None:
+    def log_orders(self, orders: List[OrderData] | OrderData, indent: int = 2, add_msg: str = "") -> None:
         indent_str = ' ' * indent
         if orders is None or (isinstance(orders, (list, tuple)) and not orders):
             logger.info("No orders to log.")
@@ -149,7 +150,7 @@ class OrderClient:
         for i, o in enumerate(orders, 1):
             tkt = getattr(o, "ticket", None);         tkt_s = "" if tkt is None else str(tkt)
             ts  = getattr(o, "time_setup", None)
-            ts_s = "" if not ts else (ts.strftime("%d-%b-%Y %H:%M:%S") if isinstance(ts, (datetime.date, datetime.datetime)) else str(ts))
+            ts_s = "" if not ts else (ts.strftime("%d-%b-%Y %H:%M:%S") if isinstance(ts, (dt.date, dt.datetime)) else str(ts))
             typ = getattr(o, "type", None);           typ_s = "" if typ is None else str(typ)
             vol = getattr(o, "volume", None);         vol_s = "" if vol is None else f"{vol:.2f}"
             prc = getattr(o, "price", None);          prc_s = "" if prc is None else f"{prc:.4f}"
@@ -164,7 +165,7 @@ class OrderClient:
             dev = getattr(o, "deviation", None);      dev_s = "" if dev is None else str(dev)
 
             logger.info((
-                f"\n{indent_str}Order {i}:"
+                f"\n{indent_str}{add_msg}:"
                 f"\n{indent_str}  Ticket: {tkt_s}"
                 f"\n{indent_str}  Time setup: {ts_s}"
                 f"\n{indent_str}  Type: {typ_s}"

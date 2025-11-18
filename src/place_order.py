@@ -8,8 +8,15 @@ import logging
 logger = logging.getLogger(__name__)
 
 def place_order(order: OrderData, order_client: OrderClient, base: mtBase, is_dry_run: bool = True) -> tuple[int, str]:
-    sym = order.symbol
     req = order_client.to_request_dict(order)
+            
+    return place_order_req(req, base, is_dry_run)
+
+def place_order_req(req: dict, base: mtBase, is_dry_run: bool = True) -> tuple[int, str]:
+    sym = req.get("symbol", None)
+    if sym is None:
+        msg = "Order request missing 'symbol' field."
+        return (1, msg)
             
     # Check order validity
     res_check: mt5.OrderCheckResult = base.order_check(req)
@@ -36,6 +43,9 @@ def place_order(order: OrderData, order_client: OrderClient, base: mtBase, is_dr
     if result_code == -1:
         msg = f"Order placement returned unknown result for {sym}: {res_placing}"
         return (1, msg)
+    if result_code == mt5.TRADE_RETCODE_MARKET_CLOSED:
+        msg = f"Order placement failed for {sym}: Market is closed."
+        return (10018, msg)
     if result_code != mt5.TRADE_RETCODE_DONE:
         msg = f"Order placement failed for {sym}: {res_placing}"
         return (1, msg)

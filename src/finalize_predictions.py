@@ -71,31 +71,7 @@ def _combine_predictions(predictions: List[PredictionData]) -> Tuple[List[Predic
 
     return unique_predictions, weights
 
-def _calc_budget(budget_mgmt: BudgetMgmt) -> float:
-    """
-    Calculate the total available budget for trading operations.
-    
-    Determines the maximum expenditure allowed by taking the minimum of:
-    1. Available free margin in the trading account
-    2. Daily capital allocation (total capital divided by per-day divisor)
-    
-    This ensures trading operations don't exceed account limits or daily risk parameters.
-    
-    Args:
-        budget_mgmt: BudgetMgmt instance containing account and risk parameters
-        
-    Returns:
-        Maximum budget available for trading as a float
-    """
-    free_margin = budget_mgmt.free_margin
-    total_capital = budget_mgmt.total_capital
-    
-    # Calculate daily capital allocation based on risk management divisor
-    total_cap_per_day = total_capital / budget_mgmt.per_day_divisor
 
-    # Use the more restrictive of free margin or daily allocation
-    budget = min(free_margin, total_cap_per_day)
-    return budget
 
 def rm_small_volume_predictions(
         predictions: List[PredictionData],
@@ -311,7 +287,7 @@ def finalize_predictions(
         return [], [], []
     
     # Step 1: Calculate total available trading budget
-    budget_all = _calc_budget(budget_mgmt)
+    budget_all = budget_mgmt.calc_daily_budget()
 
     # Step 2: Filter to most recent predictions only
     preds_latest = pred_client.latest_predictions(preds)
