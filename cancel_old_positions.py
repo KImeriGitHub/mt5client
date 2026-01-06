@@ -22,6 +22,8 @@ from src.finalize_positions_to_close import get_positions_to_close
 
 import logging
 
+from src.time_scheduler import parse_and_sleep_until_time
+
 # Global logger setup - will be reconfigured in main()
 logger = logging.getLogger(__name__)
 
@@ -48,6 +50,10 @@ def parse_args() -> argparse.Namespace:
         "--apply",
         action="store_true",
         help="If specified, positions will be actually closed. By default, runs in dry-run mode.",
+    )
+    parser.add_argument(
+        "--place_time",
+        help="Time to start placing orders in HH:MM format (e.g., '14:30'). If not provided, orders are placed immediately.",
     )
     return parser.parse_args()
 
@@ -129,6 +135,11 @@ def main(args=None, dry_run_suffix="", setup_logs=True) -> list[dict]:
 
     logger.info(f"Found {len(positions_to_close)} positions to close:")
     pos_client.log_positions(positions_to_close)
+
+    ##################################
+    ### Waiting for placement time ###
+    ##################################
+    parse_and_sleep_until_time(args.place_time)
     
     #######################
     ### CLOSE POSITIONS ###

@@ -23,6 +23,7 @@ from src.finalize_predictions import finalize_predictions
 from src.logging_utils import setup_console_and_file_logging
 from src.place_order import place_order
 from src.prediction_to_orders import prediction_to_orders
+from src.time_scheduler import parse_and_sleep_until_time
 
 import logging
 
@@ -52,6 +53,10 @@ def parse_args() -> argparse.Namespace:
         "--apply",
         action="store_true",
         help="If specified, orders will be actually placed. By default, runs in dry-run mode.",
+    )
+    parser.add_argument(
+        "--place_time",
+        help="Time to start placing orders in HH:MM format (e.g., '14:30'). If not provided, orders are placed immediately.",
     )
     return parser.parse_args()
 
@@ -127,6 +132,10 @@ def main(args=None, dry_run_suffix="", setup_logs=True) -> list[OrderData]:
         predictions_list, budget_list, volumedivisor_list, strict=True
     ))
 
+    ##################################
+    ### Waiting for placement time ###
+    ##################################
+    parse_and_sleep_until_time(args.place_time)
 
     ####################
     ### PLACE ORDERS ###
