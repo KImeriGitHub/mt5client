@@ -200,6 +200,11 @@ def main(args=None, dry_run_suffix="", setup_logs=True) -> list[dict]:
     
     logger.info(f"Results saved to {results_path}")
     
+    # Log account information before and after refresh
+    logger.info(f"Account info before refresh - Free margin: {balance_manager.free_margin:.2f}, Total capital: {balance_manager.total_capital:.2f}")
+    balance_manager.refresh()
+    logger.info(f"Account info after refresh - Free margin: {balance_manager.free_margin:.2f}, Total capital: {balance_manager.total_capital:.2f}")
+    
     return closed_positions
 
 if __name__ == "__main__":

@@ -233,6 +233,11 @@ def main(args=None, dry_run_suffix="", setup_logs=True) -> list[OrderData]:
     with placed_orders_path.open("w", encoding="utf-8") as f:
         json.dump([order.to_dict() for order in placed_orders], f, indent=2, ensure_ascii=False)
     
+    # Log account information before and after refresh
+    logger.info(f"Account info before refresh - Free margin: {balance_manager.free_margin:.2f}, Total capital: {balance_manager.total_capital:.2f}")
+    balance_manager.refresh()
+    logger.info(f"Account info after refresh - Free margin: {balance_manager.free_margin:.2f}, Total capital: {balance_manager.total_capital:.2f}")
+    
     return placed_orders
 
 if __name__ == "__main__":
