@@ -14,7 +14,7 @@ trading:
   max_working_duration_minutes: 45
   
   # Standard position sizing for production
-  per_day_divisor: 4
+  per_day_divisor: 4.8
   
   # Budget discrepancy tolerance for production (stricter tolerance)
   max_budget_discrepancy: 0.1
