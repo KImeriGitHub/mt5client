@@ -146,6 +146,23 @@ class mtBase:
         if not self.check_login():
             raise RuntimeError("Not logged in or wrong account.")
         return get_symbol_info_helper(symbol, wait_sec)
+    
+    def copy_ticks_range(self, symbol: str, date_from, date_to, flags: int) -> Optional[Any]:
+        """
+        Get ticks for a symbol within a specified time range.
+        
+        Args:
+            symbol: Trading symbol
+            date_from: Start datetime
+            date_to: End datetime
+            flags: Type of ticks to return (e.g., mt5.COPY_TICKS_ALL)
+            
+        Returns:
+            Ticks data or None if failed
+        """
+        if not self.check_login():
+            raise RuntimeError("Not logged in or wrong account.")
+        return mt5.copy_ticks_range(symbol, date_from, date_to, flags)
 
     def select_symbol(self, symbol: str, enable: bool = True) -> bool:
         """Ensure a symbol is available in the Market Watch list."""
