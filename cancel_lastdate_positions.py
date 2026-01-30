@@ -19,6 +19,7 @@ from src.infra.TradingConfig import TradingConfig
 
 from src.logging_utils import setup_console_and_file_logging
 from src.place_order import place_order_req
+from src.check_closing_price_conditions import check_closing_price_condition
 
 import logging
 
@@ -198,6 +199,13 @@ def main(args=None, dry_run_suffix="", setup_logs=True) -> list[dict]:
         if dt.datetime.now(dt.timezone.utc) - start_time > config.max_working_duration:
             logger.error("Max working duration exceeded. Stopping position closure.")
             break
+        
+        # Check for price behaviour before closing
+        status, msg = check_closing_price_condition(position.symbol, base)
+        if args.apply and status == 1:
+            logger.info(f"Keeping position open for {position.symbol}: {msg}")
+            continue
+        logger.info(msg)
         
         # Get the close position request
         close_request = pos_client.close_position_request(position)

@@ -24,6 +24,7 @@ from src.logging_utils import setup_console_and_file_logging
 from src.place_order import place_order
 from src.prediction_to_orders import prediction_to_orders
 from src.time_scheduler import parse_and_sleep_until_time
+from src.check_opening_price_condition import check_opening_price_condition
 
 import logging
 
@@ -161,6 +162,15 @@ def main(args=None, dry_run_suffix="", setup_logs=True) -> list[OrderData]:
             pending_trade_queue.append((pred, budget, volumedivisor))
             time.sleep(config.retry_wait_sec)
             continue
+
+        # Check for ideal prices series condition
+        status, msg = check_opening_price_condition(pred.symbol, base)
+        if args.apply and status == 1:
+            logger.warning(f"Requeing {pred.symbol}: {msg}")
+            pending_trade_queue.append((pred, budget, volumedivisor))
+            time.sleep(config.retry_wait_sec)
+            continue
+        logger.info(msg)
 
         # Create orders from prediction
         orders: list[OrderData] = prediction_to_orders(
