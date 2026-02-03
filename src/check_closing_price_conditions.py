@@ -112,15 +112,15 @@ def evaluate_closing_condition(
     q = 0.64 + (ret - 0.995) * (0.9 - 0.64) / 0.01
     q = float(np.clip(q, 0.64, 0.9))
     
-    # Get last minute of residuals (1 Hz sampling)
-    m = min(len(resid), 60)
-    resid_1m = resid[-m:]
+    # Get last seconds of residuals (1 Hz sampling)
+    m = min(len(resid), 30)
+    resids = resid[-m:]
     
-    if len(resid_1m) < 5:
-        return 1, f"{behaviour_str} Error: Too few pts in last minute resid. len={len(resid_1m)}"
+    if len(resids) < 5:
+        return 1, f"{behaviour_str} Error: Too few pts in seconds resid. len={len(resids)}"
     
-    thr = float(np.quantile(resid_1m, q))
-    r_end = float(resid[-1])
+    thr = float(np.quantile(resids, q))
+    r_end = float(resids[-1])
     
     # Close if last residual is high enough
     if r_end > thr:

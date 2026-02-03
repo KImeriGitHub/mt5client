@@ -118,13 +118,13 @@ def evaluate_price_condition(
         # (lower values clamp to 0.40).
         q = float(np.clip(0.37 + 0.3 * (ret - 1.000) / 0.005, 0.4, 0.90))
 
-        m = min(len(resid), 60)  # last minute (1 Hz)
-        resid_1m = resid[-m:]
-        if len(resid_1m) < 5:
-            return 1, f"{behaviour_str} Error: Window too few pts in last minute resid. len={len(resid_1m)}. Window tag={tag}"
+        m = min(len(resid), 30)  # last seconds (1 Hz)
+        resids = resid[-m:]
+        if len(resids) < 5:
+            return 1, f"{behaviour_str} Error: Window too few pts in last minute resid. len={len(resids)}. Window tag={tag}"
 
-        thr = float(np.quantile(resid_1m, q))
-        r_end = float(resid[-1])
+        thr = float(np.quantile(resids, q))
+        r_end = float(resids[-1])
 
         if r_end <= thr:
             msg = (

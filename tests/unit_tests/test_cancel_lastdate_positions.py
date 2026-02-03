@@ -334,7 +334,9 @@ class TestCancelLastdatePositionsMain:
         
         mock_budget_instance = MagicMock()
         mock_budget_instance.free_margin = 5000.0
+        mock_budget_instance.total_capital = 10000.0
         mock_budget_instance.calc_daily_budget.return_value = 1000.0
+        mock_budget_instance.refresh = MagicMock()
         mock_budget_mgmt.return_value = mock_budget_instance
         
         # Mock Path for artifacts
@@ -345,13 +347,17 @@ class TestCancelLastdatePositionsMain:
         mock_path_instance.__truediv__.return_value = mock_results_path
         mock_path.return_value = mock_path_instance
         
-        # Mock place_order_req to return success
-        with patch('cancel_lastdate_positions.place_order_req') as mock_place_order:
-            mock_place_order.return_value = (0, "DRY RUN: Order check passed for GBPUSD.")
+        # Mock check_closing_price_condition to always allow closing
+        with patch('cancel_lastdate_positions.check_closing_price_condition') as mock_check_price:
+            mock_check_price.return_value = (0, "Price condition met")
             
-            # Mock json.dump
-            with patch('cancel_lastdate_positions.json.dump') as mock_json_dump:
-                result = main(self.mock_args, setup_logs=False)
+            # Mock place_order_req to return success
+            with patch('cancel_lastdate_positions.place_order_req') as mock_place_order:
+                mock_place_order.return_value = (0, "DRY RUN: Order check passed for GBPUSD.")
+                
+                # Mock json.dump
+                with patch('cancel_lastdate_positions.json.dump') as mock_json_dump:
+                    result = main(self.mock_args, setup_logs=False)
         
         # Assertions - should only close position from most recent date (Nov 11)
         assert len(result) == 1
@@ -366,3 +372,92 @@ class TestCancelLastdatePositionsMain:
         # Verify file operations
         mock_results_path.open.assert_called_once_with("w", encoding="utf-8")
         mock_json_dump.assert_called_once()
+
+    @patch('cancel_lastdate_positions.setup_console_and_file_logging')
+    @patch('cancel_lastdate_positions.time.sleep')
+    @patch('cancel_lastdate_positions.Path')
+    @patch('cancel_lastdate_positions.TradingConfig')
+    @patch('cancel_lastdate_positions.mtBase')
+    @patch('cancel_lastdate_positions.PositionClient')
+    @patch('cancel_lastdate_positions.BudgetMgmt')
+    @patch('cancel_lastdate_positions.parse_and_sleep_until_time')
+    def test_main_requeueing_behavior(self, mock_sleep_until, mock_budget_mgmt, 
+                                     mock_pos_client, mock_mt_base,
+                                     mock_config, mock_path, mock_sleep, mock_setup_logging):
+        """Test requeueing behavior when check_closing_price_condition returns status 1."""
+        # Setup mocks
+        mock_config_instance = MagicMock()
+        mock_config_instance.log_dir = 'logs'
+        mock_config_instance.log_level = 'INFO'
+        mock_config_instance.log_format = '%(message)s'
+        mock_config_instance.log_datefmt = '%Y-%m-%d %H:%M:%S'
+        mock_config_instance.artifacts_dir = 'artifacts'
+        mock_config_instance.credentials_path = 'secrets/creds.yaml'
+        mock_config_instance.mt5_config_path = 'secrets/mt5.ini'
+        mock_config_instance.per_day_divisor = 3
+        mock_config_instance.max_budget_discrepancy = 0.1
+        mock_config_instance.max_working_duration = timedelta(minutes=30)
+        mock_config_instance.retry_wait_sec = 0.1
+        mock_config.return_value = mock_config_instance
+        
+        mock_base_instance = MagicMock()
+        mock_mt_base.return_value = mock_base_instance
+        
+        mock_pos_client_instance = MagicMock()
+        mock_pos_client_instance.get_positions.return_value = self.sample_positions
+        mock_pos_client_instance.log_positions = MagicMock()
+        mock_pos_client_instance.close_position_request.return_value = {'symbol': 'GBPUSD'}
+        mock_pos_client.return_value = mock_pos_client_instance
+        
+        mock_budget_instance = MagicMock()
+        mock_budget_instance.free_margin = 5000.0
+        mock_budget_instance.total_capital = 10000.0
+        mock_budget_instance.calc_daily_budget.return_value = 1000.0
+        mock_budget_instance.refresh = MagicMock()
+        mock_budget_mgmt.return_value = mock_budget_instance
+        
+        # Mock Path for artifacts
+        mock_results_path = MagicMock()
+        mock_results_path.open.return_value.__enter__ = MagicMock()
+        mock_results_path.open.return_value.__exit__ = MagicMock(return_value=None)
+        mock_path_instance = MagicMock()
+        mock_path_instance.__truediv__.return_value = mock_results_path
+        mock_path.return_value = mock_path_instance
+        
+        # Create args with apply flag set to True to test requeueing
+        args = argparse.Namespace(
+            account='test_account',
+            n_dates=1,
+            config='config/trading_config_prod.yaml',
+            apply=True,  # Set to True to test requeueing logic
+            place_time=None
+        )
+        
+        # Mock check_closing_price_condition to return status 1 first time, then 0
+        with patch('cancel_lastdate_positions.check_closing_price_condition') as mock_check_price:
+            mock_check_price.side_effect = [
+                (1, "Price condition not met, requeue"),  # First call - requeue
+                (0, "Price condition met")  # Second call - proceed
+            ]
+            
+            # Mock place_order_req to return success
+            with patch('cancel_lastdate_positions.place_order_req') as mock_place_order:
+                mock_place_order.return_value = (0, "Order placed successfully for GBPUSD.")
+                
+                # Mock json.dump
+                with patch('cancel_lastdate_positions.json.dump') as mock_json_dump:
+                    result = main(args, setup_logs=False)
+        
+        # Assertions
+        assert len(result) == 1
+        assert result[0] == self.sample_positions[1]  # Position from Nov 11
+        
+        # Verify check_closing_price_condition was called twice (once initially, once after requeue)
+        assert mock_check_price.call_count == 2
+        
+        # Verify sleep was called for requeueing
+        assert mock_sleep.call_count > 0
+        
+        # Verify place_order was called once (after successful price check)
+        mock_place_order.assert_called_once()
+

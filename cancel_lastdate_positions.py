@@ -7,7 +7,7 @@ import datetime as dt
 from pathlib import Path
 from datetime import date
 import time
-from collections import defaultdict
+from collections import defaultdict, deque
 
 from src.infra.BudgetMgmt import BudgetMgmt
 from src.infra.PositionData import PositionData
@@ -94,10 +94,10 @@ def get_last_n_dates_positions(positions: list[PositionData], n_dates: int = 1) 
     # Group positions by date
     positions_by_date = get_positions_by_date(positions)
     
-    # Sort dates in descending order (most recent first)
+    # Sort dates in ascending order (oldest first)
     sorted_dates = sorted(positions_by_date.keys(), reverse=False)
     
-    # Get the last n_dates
+    # Get the first n_dates (oldest)
     target_dates = sorted_dates[:n_dates]
     
     # Collect all positions from those dates
@@ -182,6 +182,9 @@ def main(args=None, dry_run_suffix="", setup_logs=True) -> list[dict]:
     logger.info(f"Found {len(positions_to_close)} positions to close:")
     pos_client.log_positions(positions_to_close)
 
+    # Create position close queue
+    position_close_queue = deque(positions_to_close)
+
     ##################################
     ### Waiting for placement time ###
     ##################################
@@ -195,15 +198,19 @@ def main(args=None, dry_run_suffix="", setup_logs=True) -> list[dict]:
     start_time = dt.datetime.now(dt.timezone.utc)
     closed_positions: list[PositionData] = []
     
-    for position in positions_to_close:
+    while len(position_close_queue) != 0:
         if dt.datetime.now(dt.timezone.utc) - start_time > config.max_working_duration:
             logger.error("Max working duration exceeded. Stopping position closure.")
             break
         
+        position = position_close_queue.popleft()
+        
         # Check for price behaviour before closing
         status, msg = check_closing_price_condition(position.symbol, base)
         if args.apply and status == 1:
-            logger.info(f"Keeping position open for {position.symbol}: {msg}")
+            logger.warning(f"Requeing {position.symbol}: {msg}")
+            position_close_queue.append(position)
+            time.sleep(config.retry_wait_sec)
             continue
         logger.info(msg)
         
